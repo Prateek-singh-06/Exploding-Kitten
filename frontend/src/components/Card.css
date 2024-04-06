@@ -1,0 +1,35 @@
+
+
+.parent{
+    perspective: 500px;
+    
+
+        /* background: rgb(0, 212, 255); */
+        /* background: linear-gradient(45deg, rgb(137,207,240) 0%, rgba(11, 3, 45, 1) 100%); */
+        background-image: url("../assets/red.jpg");
+            background-size: cover;
+            background-position: center;
+        
+        /* background-color: #DEE8C2; */
+}
+.blue{
+    background-image: url("../assets/blue.jpg");
+        background-size: cover;
+        background-position: center;
+} 
+.red{
+    background-image: url("../assets/red.jpg");
+    background-size: cover;
+    background-position: center;
+}
+.card2{
+    transform: rotateY(-180deg);
+    /* transition: transform 5s; */
+    transform-style: preserve-3d; 
+    backface-visibility: hidden;
+}
+.flipped  {
+    transform: rotateY(0deg);
+    transition: transform 400ms ease-out;
+    transform-style: preserve-3d;
+}
