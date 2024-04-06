@@ -19,7 +19,6 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-
 			return true
 		},
 	}
@@ -47,102 +46,78 @@ type User struct {
 	Score int    `json:"score"`
 }
 
-func main() {
-	http.HandleFunc("/echo", func(w http.ResponseWriter, r *http.Request) {
-		conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
-		defer conn.Close()
+// Handler handles HTTP requests.
+func Handler(w http.ResponseWriter, r *http.Request) {
+	conn, _ := upgrader.Upgrade(w, r, nil) // error ignored for sake of simplicity
+	defer conn.Close()
 
-		for {
-			// Read message from browser
-
-			msgType, msg, err := conn.ReadMessage()
-			if err != nil {
+	for {
+		// Read message from browser
+		msgType, msg, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		fmt.Println(string(msg))
+		if string(msg) != "1" {
+			var user User
+			error := json.Unmarshal([]byte(msg), &user)
+			if error != nil {
+				log.Fatal(error)
 				return
 			}
-			fmt.Println(string(msg))
-			if string(msg) != "1" {
-				var user User
-				error := json.Unmarshal([]byte(msg), &user)
-				if error != nil {
-					log.Fatal(error)
-					return
-				}
 
-				jsonUser, err := json.Marshal(user)
+			jsonUser, err := json.Marshal(user)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			err = redisClient.Set(r.Context(), user.Name, string(jsonUser), 0).Err()
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+		} else {
+			ctx := context.Background()
+			// Get all keys
+			keys, err := redisClient.Keys(ctx, "*").Result()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			usersdata := make([]User, 0)
+
+			for _, key := range keys {
+				value, err := redisClient.Get(ctx, key).Result()
+				if err != nil {
+					log.Fatal(err)
+				}
+				fmt.Println("Value:", value)
+
+				var userindb User
+				err = json.Unmarshal([]byte(value), &userindb)
 				if err != nil {
 					log.Fatal(err)
 					return
 				}
 
-				err = redisClient.Set(r.Context(), user.Name, string(jsonUser), 0).Err()
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				// log.Fatal("here")
-
-				// val, err := redisClient.Get(r.Context(), user.Name).Result()
-				// if err != nil {
-				// 	log.Fatal(err)
-				// 	return
-				// }
-
-				// var userindb User
-				// err = json.Unmarshal([]byte(val), &userindb)
-				// if err != nil {
-				// 	log.Fatal(err)
-				// 	return
-				// }
-
-				// newjsonUser, err := json.Marshal(userindb)
-				// if err != nil {
-				// 	log.Fatal(err)
-				// 	return
-				// }
-
-				// // Write message back to browser
-				// if err = conn.WriteMessage(msgType, newjsonUser); err != nil {
-				// 	return
-				// }
-				// fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(newjsonUser))
-			} else {
-				ctx := context.Background()
-				// Get all keys
-				keys, err := redisClient.Keys(ctx, "*").Result()
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				usersdata := make([]User, 0)
-
-				for _, key := range keys {
-					value, err := redisClient.Get(ctx, key).Result()
-					if err != nil {
-						log.Fatal(err)
-					}
-					fmt.Println("Value:", value)
-
-					var userindb User
-					err = json.Unmarshal([]byte(value), &userindb)
-					if err != nil {
-						log.Fatal(err)
-						return
-					}
-
-					usersdata = append(usersdata, userindb)
-
-				}
-				newjsonUser, err := json.Marshal(usersdata)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				if err = conn.WriteMessage(msgType, newjsonUser); err != nil {
-					return
-				}
+				usersdata = append(usersdata, userindb)
 
 			}
+			newjsonUser, err := json.Marshal(usersdata)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+			if err = conn.WriteMessage(msgType, newjsonUser); err != nil {
+				return
+			}
+
 		}
-	})
+	}
+}
+
+func main() {
+	http.HandleFunc("/echo", Handler)
 	http.ListenAndServe(":8080", nil)
 }
